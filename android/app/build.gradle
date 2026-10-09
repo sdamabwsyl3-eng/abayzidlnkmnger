@@ -1,50 +1,13 @@
-def localPropertiesFile = rootProject.file("../local.properties")
-def localProperties = new Properties()
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader('UTF-8') { localProperties.load(it) }
-}
-def flutterRoot = localProperties.getProperty('flutter.sdk')
-
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
-
 android {
     namespace "com.example.abayazidlnkmnger"
     compileSdk 34
-    ndkVersion flutter.ndkVersion
-
+    
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-
+    
     kotlinOptions {
         jvmTarget = '1.8'
     }
-
-    sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
-    }
-
-    defaultConfig {
-        applicationId "com.example.abayazidlnkmnger"
-        minSdk 21
-        targetSdk 34
-        versionCode 1
-        versionName "4.2.0"
-    }
-
-    buildTypes {
-        release {
-            minifyEnabled false
-            shrinkResources false
-        }
-    }
 }
-
-flutter {
-    source '../..'
-}
-
-dependencies {}
