@@ -1,0 +1,23 @@
+name: abayazidlnkmnger
+description: منظومة إدارة وتوزيع شبكات Starlink وميكروتك وطباعة الكروت الحرارية
+publish_to: 'none'
+version: 4.2.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  shared_preferences: ^2.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
