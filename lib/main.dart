@@ -21,7 +21,7 @@ class MyApp extends StatelessWidget {
           background: const Color(0xFFF5F7FA),
         ),
         useMaterial3: true,
-        fontFamily: 'Cairo',
+        fontFamily: 'IBMPlexSansArabic', // ✅ تم التعديل
         scaffoldBackgroundColor: const Color(0xFF0F2B48),
       ),
       home: const LoginPage(),
