@@ -21,3 +21,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  fonts:
+    - family: IBMPlexSansArabic
+      fonts:
+        - asset: lib/fonts/IBMPlexSansArabic-Regular.ttf
+        - asset: lib/fonts/IBMPlexSansArabic-Bold.ttf
+          weight: 700
