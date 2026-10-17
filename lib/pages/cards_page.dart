@@ -1,9 +1,85 @@
 import 'package:flutter/material.dart';
+import '../models/package_model.dart';
+import '../services/supabase_data_service.dart';
 import '../widgets/common_header.dart';
 import '../widgets/card_widget.dart';
 
-class CardsPage extends StatelessWidget {
+class CardsPage extends StatefulWidget {
   const CardsPage({super.key});
+
+  @override
+  State<CardsPage> createState() => _CardsPageState();
+}
+
+class _CardsPageState extends State<CardsPage> {
+  late Future<List<PackageModel>> _packagesFuture;
+  PackageModel? _selectedPackage;
+  bool _printing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _packagesFuture = SupabaseDataService.fetchPackages();
+  }
+
+  Future<void> _printCards() async {
+    final selected = _selectedPackage;
+    if (selected == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('اختر باقة أولاً')),
+      );
+      return;
+    }
+
+    final quantity = await showDialog<int>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController(text: '10');
+        return AlertDialog(
+          backgroundColor: const Color(0xFF111827),
+          title: const Text('عدد الكروت', style: TextStyle(color: Colors.white)),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: const Color(0xFF1F2937),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, int.tryParse(controller.text.trim())),
+              child: const Text('طباعة'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (quantity == null || quantity <= 0 || quantity > 500) return;
+
+    setState(() => _printing = true);
+    try {
+      final cards = await SupabaseDataService.generateCards(
+        packageId: selected.id,
+        quantity: quantity,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم إنشاء ${cards.length} كرت لباقة "${selected.name}" بنجاح')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذّر إنشاء الكروت: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,38 +104,42 @@ class CardsPage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'أنشئ واطبع كروت الشبكة بسهولة',
+            'اختر باقة ثم أنشئ واطبع كروتها',
             style: TextStyle(color: Colors.grey, fontSize: 14),
           ),
           const SizedBox(height: 24),
 
-          AppCard(
-            title: 'باقة أسبوعية',
-            subtitle: 'صلاحية 7 أيام — سرعة غير محدودة',
-            trailing: _buildPrice('50 SDG'),
-            onTap: () {},
-          ),
+          FutureBuilder<List<PackageModel>>(
+            future: _packagesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text('تعذّر تحميل الباقات: ${snapshot.error}', style: const TextStyle(color: Colors.red)),
+                );
+              }
+              final packages = snapshot.data ?? const [];
+              _selectedPackage ??= packages.isNotEmpty ? packages.first : null;
 
-          AppCard(
-            title: 'باقة شهرية — أساسية',
-            subtitle: 'صلاحية 30 يوم — 100 جيجا',
-            trailing: _buildPrice('200 SDG'),
-            onTap: () {},
-          ),
-
-          AppCard(
-            title: 'باقة شهرية — متقدمة',
-            subtitle: 'صلاحية 30 يوم — سرعة غير محدودة',
-            trailing: _buildPrice('350 SDG'),
-            onTap: () {},
-          ),
-
-          AppCard(
-            title: 'باقة سنوية',
-            subtitle: 'أفضل قيمة — توفير 25%',
-            trailing: _buildPrice('3,500 SDG'),
-            color: const Color(0xFF1E88E5).withOpacity(0.15),
-            onTap: () {},
+              return Column(
+                children: packages.map((p) {
+                  final selected = _selectedPackage?.id == p.id;
+                  return AppCard(
+                    title: p.name,
+                    subtitle: p.subtitle,
+                    trailing: _buildPrice(p.priceLabel),
+                    color: selected ? const Color(0xFF1E88E5).withOpacity(0.25) : null,
+                    onTap: () => setState(() => _selectedPackage = p),
+                  );
+                }).toList(),
+              );
+            },
           ),
 
           const SizedBox(height: 30),
@@ -67,12 +147,18 @@ class CardsPage extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: _printing ? null : _printCards,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1E88E5),
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              icon: const Icon(Icons.print),
+              icon: _printing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                    )
+                  : const Icon(Icons.print),
               label: const Text('طباعة كروت جديدة', style: TextStyle(fontSize: 16)),
             ),
           ),

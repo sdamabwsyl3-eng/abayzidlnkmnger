@@ -1,8 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/operator_profile_model.dart';
+import '../services/supabase_data_service.dart';
 import '../widgets/common_header.dart';
+import 'login_page.dart';
 
-class AccountPage extends StatelessWidget {
+class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
+
+  @override
+  State<AccountPage> createState() => _AccountPageState();
+}
+
+class _AccountPageState extends State<AccountPage> {
+  late Future<OperatorProfile?> _profileFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileFuture = SupabaseDataService.fetchMyProfile();
+  }
+
+  String get _displayName {
+    final user = Supabase.instance.client.auth.currentUser;
+    final fullName = (user?.userMetadata?['full_name'] as String?)?.trim();
+    if (fullName != null && fullName.isNotEmpty) return fullName;
+    return user?.email?.split('@').first ?? 'مستخدم أبا يزيد';
+  }
+
+  String get _email => Supabase.instance.client.auth.currentUser?.email ?? '';
+
+  Future<void> _logout() async {
+    await Supabase.instance.client.auth.signOut();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,18 +70,19 @@ class AccountPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'مدير النظام',
-                  style: TextStyle(
+                Text(
+                  _displayName,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'admin@abayazeed.sd',
-                  style: TextStyle(color: Colors.grey, fontSize: 14),
+                Text(
+                  _email,
+                  style: const TextStyle(color: Colors.grey, fontSize: 14),
+                  textDirection: TextDirection.ltr,
                 ),
                 const SizedBox(height: 8),
                 Container(
@@ -56,7 +92,7 @@ class AccountPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
-                    'مدير رئيسي',
+                    'حساب موثّق',
                     style: TextStyle(color: Colors.green, fontSize: 12),
                   ),
                 ),
@@ -78,8 +114,17 @@ class AccountPage extends StatelessWidget {
 
           _buildInfoItem(Icons.info_outline, 'اسم التطبيق', 'أبا يزيد لنك منجر'),
           _buildInfoItem(Icons.code, 'الإصدار', '4.2.0'),
-          _buildInfoItem(Icons.calendar_today, 'تاريخ التحديث', '09 أكتوبر 2026'),
-          _buildInfoItem(Icons.location_on, 'المنطقة', 'السودان — الخرطوم'),
+          FutureBuilder<OperatorProfile?>(
+            future: _profileFuture,
+            builder: (context, snapshot) {
+              final region = snapshot.data?.region;
+              return _buildInfoItem(
+                Icons.location_on,
+                'المنطقة',
+                (region != null && region.isNotEmpty) ? region : 'غير محددة',
+              );
+            },
+          ),
 
           const SizedBox(height: 30),
 
@@ -97,9 +142,7 @@ class AccountPage extends StatelessWidget {
           _buildSettingItem(Icons.notifications_outlined, 'الإشعارات', () {}),
           _buildSettingItem(Icons.privacy_tip_outlined, 'الخصوصية والأمان', () {}),
           _buildSettingItem(Icons.help_outline, 'حول التطبيق', () {}),
-          _buildSettingItem(Icons.logout, 'تسجيل الخروج', () {
-            Navigator.popUntil(context, (route) => route.isFirst);
-          }, isDanger: true),
+          _buildSettingItem(Icons.logout, 'تسجيل الخروج', _logout, isDanger: true),
 
           const SizedBox(height: 40),
 

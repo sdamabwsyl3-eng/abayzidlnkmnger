@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/supabase_data_service.dart';
 import '../widgets/common_header.dart';
 import '../widgets/bottom_nav_bar.dart';
 import 'cards_page.dart';
 import 'store_page.dart';
 import 'solutions_page.dart';
 import 'account_page.dart';
+import 'login_page.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final String? routerIp;
+  const HomePage({super.key, this.routerIp});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -16,29 +20,28 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 4; // الصفحة الرئيسية افتراضياً
 
-  // قائمة الصفحات
-  final List<Widget> _pages = const [
-    AccountPage(),
-    SolutionsPage(),
-    StorePage(),
-    CardsPage(),
-    HomeContent(),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final pages = [
+      const AccountPage(),
+      const SolutionsPage(),
+      const StorePage(),
+      const CardsPage(),
+      HomeContent(routerIp: widget.routerIp),
+    ];
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F2B48),
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const CommonHeader(
-          connectionName: 'MikroTik — 192.168.88.1',
+        title: CommonHeader(
+          connectionName: 'MikroTik — ${widget.routerIp ?? '192.168.88.1'}',
           isOnline: true,
         ),
       ),
-      body: _pages[_currentIndex],
+      body: pages[_currentIndex],
       bottomNavigationBar: BottomNavBar(
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -52,8 +55,31 @@ class _HomePageState extends State<HomePage> {
 }
 
 // محتوى الصفحة الرئيسية
-class HomeContent extends StatelessWidget {
-  const HomeContent({super.key});
+class HomeContent extends StatefulWidget {
+  final String? routerIp;
+  const HomeContent({super.key, this.routerIp});
+
+  @override
+  State<HomeContent> createState() => _HomeContentState();
+}
+
+class _HomeContentState extends State<HomeContent> {
+  late Future<Map<String, int>> _statsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _statsFuture = SupabaseDataService.fetchDashboardStats();
+  }
+
+  Future<void> _logout() async {
+    await Supabase.instance.client.auth.signOut();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,30 +104,45 @@ class HomeContent extends StatelessWidget {
           const SizedBox(height: 30),
 
           // بطاقات الإحصائيات
-          Row(
-            textDirection: TextDirection.rtl,
-            children: [
-              Expanded(
-                child: _buildStatCard('العملاء النشطون', '128', Icons.people, const Color(0xFF1E88E5)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatCard('الباقات المفعلة', '45', Icons.wifi, Colors.green),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            textDirection: TextDirection.rtl,
-            children: [
-              Expanded(
-                child: _buildStatCard('الطباعات اليوم', '32', Icons.print, Colors.orange),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatCard('حالة النظام', 'ممتاز', Icons.check_circle, Colors.teal),
-              ),
-            ],
+          FutureBuilder<Map<String, int>>(
+            future: _statsFuture,
+            builder: (context, snapshot) {
+              final loading = snapshot.connectionState == ConnectionState.waiting;
+              final stats = snapshot.data;
+              final clients = loading ? '...' : '${stats?['activeClients'] ?? 0}';
+              final packages = loading ? '...' : '${stats?['activePackages'] ?? 0}';
+              final printed = loading ? '...' : '${stats?['printedToday'] ?? 0}';
+
+              return Column(
+                children: [
+                  Row(
+                    textDirection: TextDirection.rtl,
+                    children: [
+                      Expanded(
+                        child: _buildStatCard('العملاء النشطون', clients, Icons.people, const Color(0xFF1E88E5)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard('الباقات المفعلة', packages, Icons.wifi, Colors.green),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    textDirection: TextDirection.rtl,
+                    children: [
+                      Expanded(
+                        child: _buildStatCard('الطباعات اليوم', printed, Icons.print, Colors.orange),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard('حالة النظام', 'ممتاز', Icons.check_circle, Colors.teal),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
           ),
 
           const SizedBox(height: 30),
@@ -156,9 +197,7 @@ class HomeContent extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-              },
+              onPressed: _logout,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red.withOpacity(0.15),
                 foregroundColor: Colors.red,
@@ -190,7 +229,7 @@ class HomeContent extends StatelessWidget {
             children: [
               Text(
                 value,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
