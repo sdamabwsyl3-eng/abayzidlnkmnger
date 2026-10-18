@@ -27,6 +27,16 @@ jobs:
       - name: Create Android project files
         run: flutter create --org com.example . --platforms android
 
+      - name: Grant INTERNET permission for release builds
+        # Flutter's generated android/app/src/main/AndroidManifest.xml has no
+        # <uses-permission> block by default. The debug variant gets INTERNET
+        # access automatically via android/app/src/debug/AndroidManifest.xml,
+        # but a --release build does not inherit that, so every network call
+        # (Supabase auth/API) fails with "Failed host lookup" at runtime.
+        run: |
+          sed -i 's#<manifest xmlns:android="http://schemas.android.com/apk/res/android">#<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET"/>#' android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml
+
       - name: Install dependencies
         run: flutter pub get
 
