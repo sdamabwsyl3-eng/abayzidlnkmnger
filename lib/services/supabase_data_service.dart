@@ -76,25 +76,49 @@ class SupabaseDataService {
   }
 
   /// إحصائيات لوحة التحكم: عدد الكروت المفعّلة (المباعة/المستخدمة)، عدد
-  /// الباقات، وعدد الكروت المطبوعة اليوم.
-  static Future<Map<String, int>> fetchDashboardStats() async {
+  /// الباقات غير المستخدمة (الرصيد المتاح)، وعدد الكروت المطبوعة اليوم
+  /// وهذا الشهر، إضافة لعدد الكروت المطبوعة يومياً في آخر 7 أيام (لرسم
+  /// بياني صغير). كل الأرقام هنا حقيقية من جدول cards، وليست بيانات شبكة
+  /// حيّة — تلك تحتاج ربط فعلي بجهاز MikroTik (غير متاح هنا).
+  static Future<Map<String, dynamic>> fetchDashboardStats() async {
     final uid = _uidOrThrow;
     final cards = await _client.from('cards').select('status, created_at').eq('owner_id', uid);
     final packages = await _client.from('packages').select('id').eq('owner_id', uid);
 
     final cardRows = (cards as List<dynamic>).cast<Map<String, dynamic>>();
+    final dates = cardRows.map((c) => DateTime.parse(c['created_at'] as String).toLocal()).toList();
+
     final activeClients = cardRows.where((c) => c['status'] != 'unused').length;
+    final unusedCards = cardRows.where((c) => c['status'] == 'unused').length;
+
     final today = DateTime.now();
-    final printedToday = cardRows.where((c) {
-      final d = DateTime.parse(c['created_at'] as String).toLocal();
-      return d.year == today.year && d.month == today.month && d.day == today.day;
-    }).length;
+    final printedToday = dates.where((d) => d.year == today.year && d.month == today.month && d.day == today.day).length;
+    final printedThisMonth = dates.where((d) => d.year == today.year && d.month == today.month).length;
+
+    final last7Days = List<int>.generate(7, (i) {
+      final day = DateTime(today.year, today.month, today.day).subtract(Duration(days: 6 - i));
+      return dates.where((d) => d.year == day.year && d.month == day.month && d.day == day.day).length;
+    });
 
     return {
       'activeClients': activeClients,
       'activePackages': (packages as List).length,
       'printedToday': printedToday,
+      'unusedCards': unusedCards,
+      'printedThisMonth': printedThisMonth,
+      'last7Days': last7Days,
     };
+  }
+
+  /// يجلب كل الكروت الخاصة بالمشغّل الحالي (الأحدث أولاً) مع اسم باقة كل كرت.
+  static Future<List<CardModel>> fetchMyCards() async {
+    final uid = _uidOrThrow;
+    final rows = await _client
+        .from('cards')
+        .select('*, package:packages!package_id(name)')
+        .eq('owner_id', uid)
+        .order('created_at', ascending: false);
+    return (rows as List<dynamic>).map((r) => CardModel.fromJson(r as Map<String, dynamic>)).toList();
   }
 
   /// يجلب عناصر المتجر الخاصة بالمشغّل الحالي، وينشئ العناصر الافتراضية
