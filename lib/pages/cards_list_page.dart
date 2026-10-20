@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/card_model.dart';
 import '../services/supabase_data_service.dart';
 import '../widgets/common_header.dart';
+import 'card_detail_page.dart';
 
 class CardsListPage extends StatefulWidget {
   const CardsListPage({super.key});
@@ -105,7 +106,13 @@ class _CardsListPageState extends State<CardsListPage> {
                     itemCount: cards.length,
                     itemBuilder: (ctx, i) {
                       final c = cards[i];
-                      return Container(
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => CardDetailPage(card: c)),
+                          );
+                        },
+                        child: Container(
                         margin: const EdgeInsets.only(bottom: 10),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -154,6 +161,7 @@ class _CardsListPageState extends State<CardsListPage> {
                               ),
                             ),
                           ],
+                        ),
                         ),
                       );
                     },

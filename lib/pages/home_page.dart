@@ -7,7 +7,7 @@ import '../widgets/bottom_nav_bar.dart';
 import '../widgets/sparkline.dart';
 import 'cards_page.dart';
 import 'cards_list_page.dart';
-import 'monitoring_page.dart';
+import 'mikrotik_management_page.dart';
 import 'store_page.dart';
 import 'solutions_page.dart';
 import 'account_page.dart';
@@ -307,12 +307,12 @@ class _HomeContentState extends State<HomeContent> {
 
             _buildQuickAccessCard(
               context,
-              title: 'المراقبة',
-              subtitle: 'متابعة المشتركين المتصلين',
+              title: 'إدارة MikroTik والمراقبة',
+              subtitle: 'المستخدمون النشطون، إعدادات الشبكة، وأكثر',
               icon: Icons.monitor_heart_outlined,
               onTap: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const MonitoringPage()),
+                  MaterialPageRoute(builder: (_) => const MikrotikManagementPage()),
                 );
               },
             ),

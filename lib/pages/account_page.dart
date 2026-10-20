@@ -4,6 +4,9 @@ import '../models/operator_profile_model.dart';
 import '../services/supabase_data_service.dart';
 import '../widgets/common_header.dart';
 import 'login_page.dart';
+import 'mikrotik_management_page.dart';
+import 'statistics_page.dart';
+import 'settings_page.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -139,8 +142,21 @@ class _AccountPageState extends State<AccountPage> {
           ),
           const SizedBox(height: 12),
 
-          _buildSettingItem(Icons.notifications_outlined, 'الإشعارات', () {}),
-          _buildSettingItem(Icons.privacy_tip_outlined, 'الخصوصية والأمان', () {}),
+          _buildSettingItem(Icons.router_outlined, 'إدارة MikroTik', () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MikrotikManagementPage()),
+            );
+          }),
+          _buildSettingItem(Icons.bar_chart_outlined, 'الإحصائيات والتقارير', () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const StatisticsPage()),
+            );
+          }),
+          _buildSettingItem(Icons.settings_outlined, 'الإعدادات', () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsPage()),
+            );
+          }),
           _buildSettingItem(Icons.help_outline, 'حول التطبيق', () {}),
           _buildSettingItem(Icons.logout, 'تسجيل الخروج', _logout, isDanger: true),
 

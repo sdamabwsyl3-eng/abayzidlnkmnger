@@ -37,8 +37,19 @@ jobs:
           sed -i 's#<manifest xmlns:android="http://schemas.android.com/apk/res/android">#<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET"/>#' android/app/src/main/AndroidManifest.xml
           grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml
 
+      - name: Set Arabic app label
+        # Replace whatever android:label flutter create generated (it varies
+        # by Flutter version/template) with the Arabic app name, so it shows
+        # correctly after installation regardless of the generated default.
+        run: |
+          sed -i 's#android:label="[^"]*"#android:label="أبا يزيد لنك منجر"#' android/app/src/main/AndroidManifest.xml
+          grep -q 'أبا يزيد لنك منجر' android/app/src/main/AndroidManifest.xml
+
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Generate launcher icon
+        run: dart run flutter_launcher_icons
 
       - name: Build APK
         run: flutter build apk --release --no-tree-shake-icons

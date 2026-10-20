@@ -115,10 +115,36 @@ class SupabaseDataService {
     final uid = _uidOrThrow;
     final rows = await _client
         .from('cards')
-        .select('*, package:packages!package_id(name)')
+        .select('*, package:packages!package_id(name, duration_days)')
         .eq('owner_id', uid)
         .order('created_at', ascending: false);
     return (rows as List<dynamic>).map((r) => CardModel.fromJson(r as Map<String, dynamic>)).toList();
+  }
+
+  /// يجلب تواريخ إنشاء كل الكروت الخاصة بالمشغّل الحالي (لحساب إحصائيات
+  /// الطباعة حسب الفترة الزمنية: اليوم/الأسبوع/الشهر/السنة).
+  static Future<List<DateTime>> fetchCardCreationDates() async {
+    final uid = _uidOrThrow;
+    final rows = await _client.from('cards').select('created_at').eq('owner_id', uid);
+    return (rows as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map((r) => DateTime.parse(r['created_at'] as String).toLocal())
+        .toList();
+  }
+
+  /// يجلب توزيع الكروت حسب الباقة (للرسم البياني الدائري في شاشة الإحصائيات).
+  static Future<Map<String, int>> fetchCardCountByPackage() async {
+    final uid = _uidOrThrow;
+    final rows = await _client
+        .from('cards')
+        .select('package:packages!package_id(name)')
+        .eq('owner_id', uid);
+    final counts = <String, int>{};
+    for (final r in (rows as List<dynamic>).cast<Map<String, dynamic>>()) {
+      final name = (r['package'] as Map<String, dynamic>?)?['name'] as String? ?? 'غير معروف';
+      counts[name] = (counts[name] ?? 0) + 1;
+    }
+    return counts;
   }
 
   /// يجلب عناصر المتجر الخاصة بالمشغّل الحالي، وينشئ العناصر الافتراضية

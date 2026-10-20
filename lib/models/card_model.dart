@@ -5,6 +5,7 @@ class CardModel {
   final String status; // unused | sold | used
   final DateTime createdAt;
   final String? packageName;
+  final int? packageDurationDays;
 
   CardModel({
     required this.id,
@@ -13,7 +14,11 @@ class CardModel {
     required this.status,
     required this.createdAt,
     this.packageName,
+    this.packageDurationDays,
   });
+
+  DateTime? get expiresAt =>
+      packageDurationDays == null ? null : createdAt.add(Duration(days: packageDurationDays!));
 
   factory CardModel.fromJson(Map<String, dynamic> j) {
     final package = j['package'] as Map<String, dynamic>?;
@@ -24,6 +29,7 @@ class CardModel {
       status: j['status'] as String? ?? 'unused',
       createdAt: DateTime.parse(j['created_at'] as String).toLocal(),
       packageName: package?['name'] as String?,
+      packageDurationDays: package?['duration_days'] as int?,
     );
   }
 }
