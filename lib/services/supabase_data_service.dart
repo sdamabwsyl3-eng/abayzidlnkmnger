@@ -3,6 +3,9 @@ import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/card_model.dart';
+import '../models/card_template_model.dart';
+import '../models/credit_topup_request_model.dart';
+import '../models/device_model.dart';
 import '../models/operator_profile_model.dart';
 import '../models/package_model.dart';
 import '../models/store_item_model.dart';
@@ -54,25 +57,131 @@ class SupabaseDataService {
     return (rows as List<dynamic>).map((r) => PackageModel.fromJson(r as Map<String, dynamic>)).toList();
   }
 
-  /// يولّد كروتاً جديدة لباقة معيّنة بأكواد فريدة (محاكاة "الطباعة").
+  /// يولّد كروتاً جديدة لباقة معيّنة بأكواد فريدة بطول مختار (افتراضياً 12 رقم)،
+  /// وقالب تصميم اختياري. يخصم الكمية من رصيد الكروت المتاح، ويرفض الطلب
+  /// برسالة واضحة لو الرصيد غير كافٍ بدل توليد كروت بلا حساب.
   static Future<List<CardModel>> generateCards({
     required String packageId,
     required int quantity,
+    int codeLength = 12,
+    String? templateId,
   }) async {
     final uid = _uidOrThrow;
+    final balance = await fetchCardCreditBalance();
+    if (balance < quantity) {
+      throw Exception('رصيد الكروت غير كافٍ (المتاح: $balance، المطلوب: $quantity) — اشحن رصيدك أولاً');
+    }
+
     final random = Random.secure();
     final rows = List.generate(quantity, (_) {
-      final code = List.generate(12, (_) => random.nextInt(10)).join();
-      final grouped = '${code.substring(0, 4)}-${code.substring(4, 8)}-${code.substring(8, 12)}';
+      final code = List.generate(codeLength, (_) => random.nextInt(10)).join();
       return {
         'owner_id': uid,
         'package_id': packageId,
-        'code': grouped,
+        'code': code,
         'status': 'unused',
+        'code_length': codeLength,
+        if (templateId != null) 'template_id': templateId,
       };
     });
     final inserted = await _client.from('cards').insert(rows).select();
+
+    await _client
+        .from('profiles')
+        .update({'card_credit_balance': balance - quantity})
+        .eq('id', uid);
+
     return (inserted as List<dynamic>).map((r) => CardModel.fromJson(r as Map<String, dynamic>)).toList();
+  }
+
+  /// يجلب رصيد الكروت المتاح للمشغّل الحالي (الشارة الظاهرة في شاشة التوليد).
+  static Future<int> fetchCardCreditBalance() async {
+    final uid = _uidOrThrow;
+    final row = await _client.from('profiles').select('card_credit_balance').eq('id', uid).maybeSingle();
+    return row?['card_credit_balance'] as int? ?? 0;
+  }
+
+  /// يجلب قوالب تصميم الكروت الخاصة بالمشغّل الحالي.
+  static Future<List<CardTemplate>> fetchCardTemplates() async {
+    final uid = _uidOrThrow;
+    final rows = await _client
+        .from('card_templates')
+        .select()
+        .eq('owner_id', uid)
+        .order('created_at', ascending: true);
+    return (rows as List<dynamic>).map((r) => CardTemplate.fromJson(r as Map<String, dynamic>)).toList();
+  }
+
+  /// يضيف قالب تصميم جديد للكروت.
+  static Future<CardTemplate> createCardTemplate({required String name, String? thumbnailUrl}) async {
+    final uid = _uidOrThrow;
+    final row = await _client
+        .from('card_templates')
+        .insert({'owner_id': uid, 'name': name, if (thumbnailUrl != null) 'thumbnail_url': thumbnailUrl})
+        .select()
+        .single();
+    return CardTemplate.fromJson(row);
+  }
+
+  /// يرسل طلب شحن رصيد كروت (تحويل يدوي — بنكك/تحويل بنكي — بموافقة أدمن لاحقاً).
+  /// الطلب يبقى "قيد المراجعة" لحد ما يراجعه الأدمن يدوياً؛ الرصيد يُضاف تلقائياً
+  /// عند الموافقة عبر trigger في قاعدة البيانات، مش من التطبيق.
+  static Future<void> requestCreditTopup({
+    required int credits,
+    required String paymentMethod,
+    required String referenceNote,
+  }) async {
+    final uid = _uidOrThrow;
+    await _client.from('credit_topup_requests').insert({
+      'owner_id': uid,
+      'requested_credits': credits,
+      'payment_method': paymentMethod,
+      'reference_note': referenceNote,
+    });
+  }
+
+  /// يجلب أجهزة MikroTik المسجّلة لدى المشغّل الحالي (بيانات وصفية فقط —
+  /// بيانات دخول الراوتر نفسها محليّة على الجهاز ولا تُخزَّن هنا).
+  static Future<List<DeviceModel>> fetchMyDevices() async {
+    final uid = _uidOrThrow;
+    final rows = await _client
+        .from('devices')
+        .select()
+        .eq('owner_id', uid)
+        .order('created_at', ascending: true);
+    return (rows as List<dynamic>).map((r) => DeviceModel.fromJson(r as Map<String, dynamic>)).toList();
+  }
+
+  /// يسجّل جهاز MikroTik جديد (وصفياً) — يُستخدم عند بدء معالج إعداد الراوتر.
+  /// الوضع الافتراضي "مسح كامل" (fresh_wipe) حسب الأولوية المتفق عليها.
+  static Future<DeviceModel> createDevice({
+    required String name,
+    String? model,
+    String setupMode = 'fresh_wipe',
+  }) async {
+    final uid = _uidOrThrow;
+    final row = await _client
+        .from('devices')
+        .insert({
+          'owner_id': uid,
+          'name': name,
+          if (model != null) 'model': model,
+          'setup_mode': setupMode,
+        })
+        .select()
+        .single();
+    return DeviceModel.fromJson(row);
+  }
+
+  /// يجلب طلبات شحن الرصيد السابقة للمشغّل الحالي (الأحدث أولاً).
+  static Future<List<CreditTopupRequest>> fetchMyTopupRequests() async {
+    final uid = _uidOrThrow;
+    final rows = await _client
+        .from('credit_topup_requests')
+        .select()
+        .eq('owner_id', uid)
+        .order('created_at', ascending: false);
+    return (rows as List<dynamic>).map((r) => CreditTopupRequest.fromJson(r as Map<String, dynamic>)).toList();
   }
 
   /// إحصائيات لوحة التحكم: عدد الكروت المفعّلة (المباعة/المستخدمة)، عدد

@@ -114,3 +114,107 @@ create policy "owners manage their store orders"
   on public.store_orders for all
   using (auth.uid() = owner_id)
   with check (auth.uid() = owner_id);
+
+-- 6) رصيد الكروت (العداد الظاهر في شاشة توليد الكروت) — كل عملية توليد كروت
+-- تخصم من الرصيد، وكل طلب شحن موافَق عليه يضيف له.
+alter table public.profiles
+  add column if not exists card_credit_balance integer not null default 0;
+
+-- 7) قوالب تصميم الكروت (قسم "تخصيص الكرت" عند توليد كروت جديدة)
+create table if not exists public.card_templates (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.profiles (id) on delete cascade,
+  name text not null,
+  thumbnail_url text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.card_templates enable row level security;
+
+drop policy if exists "owners manage their card templates" on public.card_templates;
+create policy "owners manage their card templates"
+  on public.card_templates for all
+  using (auth.uid() = owner_id)
+  with check (auth.uid() = owner_id);
+
+-- 8) أعمدة إضافية على الكروت: القالب المستخدم، طول الكود المختار لكل دفعة،
+-- وعنوان MAC الجهاز اللي اتقفل عليه الكرت أول ما يتفعّل (قفل الكرت على جهاز واحد)
+alter table public.cards
+  add column if not exists template_id uuid references public.card_templates (id) on delete set null,
+  add column if not exists code_length integer not null default 12,
+  add column if not exists locked_device_mac text;
+
+-- 9) أجهزة MikroTik المرتبطة بكل مشغّل. بيانات دخول الراوتر (IP/يوزر/باسورد)
+-- ما بتتخزن هنا أبداً — دي بتفضل محلياً على جهاز المشغّل فقط (شاشة الإعدادات).
+-- هذا الجدول بيانات وصفية بس (الموديل، حالة الربط) لعرضها في لوحة التحكم.
+create table if not exists public.devices (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.profiles (id) on delete cascade,
+  name text not null,
+  model text,
+  setup_mode text not null default 'fresh_wipe'
+    check (setup_mode in ('fresh_wipe', 'adopt_existing')),
+  status text not null default 'setting_up'
+    check (status in ('linked', 'setting_up', 'offline')),
+  created_at timestamptz not null default now()
+);
+
+alter table public.devices enable row level security;
+
+drop policy if exists "owners manage their devices" on public.devices;
+create policy "owners manage their devices"
+  on public.devices for all
+  using (auth.uid() = owner_id)
+  with check (auth.uid() = owner_id);
+
+-- 10) طلبات شحن رصيد الكروت — تحويل يدوي (بنكك / تحويل بنكي) بموافقة أدمن.
+-- المشغّل يرسل طلب برقم مرجع التحويل، وحالته "قيد المراجعة" لحد ما يراجعها
+-- الأدمن يدوياً من لوحة Supabase ويغيّر status إلى 'approved' — عندها الـ trigger
+-- تحت بيضيف الرصيد تلقائياً لحساب المشغّل.
+create table if not exists public.credit_topup_requests (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.profiles (id) on delete cascade,
+  requested_credits integer not null check (requested_credits > 0),
+  payment_method text not null default 'بنكك', -- بنكك | تحويل بنكي | أخرى
+  reference_note text not null default '',
+  status text not null default 'pending'
+    check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz
+);
+
+alter table public.credit_topup_requests enable row level security;
+
+-- المشغّل يقدر يشوف طلباته وينشئ طلب جديد بس — مش يعدّل حالتها (الموافقة أدمن فقط،
+-- يدوياً من Supabase Dashboard بصلاحيات أعلى من الـ RLS دي).
+drop policy if exists "owners view their topup requests" on public.credit_topup_requests;
+create policy "owners view their topup requests"
+  on public.credit_topup_requests for select
+  using (auth.uid() = owner_id);
+
+drop policy if exists "owners create topup requests" on public.credit_topup_requests;
+create policy "owners create topup requests"
+  on public.credit_topup_requests for insert
+  with check (auth.uid() = owner_id and status = 'pending');
+
+-- عند الموافقة على طلب شحن، تُضاف الكروت لرصيد المشغّل تلقائياً.
+create or replace function public.handle_credit_topup_approved()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if new.status = 'approved' and old.status is distinct from 'approved' then
+    update public.profiles
+      set card_credit_balance = card_credit_balance + new.requested_credits
+      where id = new.owner_id;
+    new.reviewed_at = now();
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_credit_topup_approved on public.credit_topup_requests;
+create trigger on_credit_topup_approved
+  before update on public.credit_topup_requests
+  for each row execute procedure public.handle_credit_topup_approved();
