@@ -3,6 +3,7 @@ import '../widgets/common_header.dart';
 import '../widgets/card_widget.dart';
 import 'cards_list_page.dart';
 import 'monitoring_page.dart';
+import 'router_setup_wizard_page.dart';
 import 'settings_page.dart';
 
 /// مركز إدارة MikroTik: نقطة دخول موحّدة لكل شاشات إدارة الشبكة والكروت.
@@ -77,6 +78,13 @@ class MikrotikManagementPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
 
+                    AppCard(
+                      title: 'تجهيز راوتر جديد',
+                      subtitle: 'معالج ربط جهاز MikroTik (مسح كامل أو تبنّي الإعداد الحالي)',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const RouterSetupWizardPage()),
+                      ),
+                    ),
                     AppCard(
                       title: 'المستخدمون النشطون',
                       subtitle: 'متابعة المشتركين المتصلين بالشبكة',

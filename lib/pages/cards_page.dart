@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import '../models/card_template_model.dart';
 import '../models/package_model.dart';
 import '../services/supabase_data_service.dart';
 import '../widgets/common_header.dart';
 import '../widgets/card_widget.dart';
 import 'cards_list_page.dart';
+import 'credit_topup_page.dart';
 
 class CardsPage extends StatefulWidget {
   const CardsPage({super.key});
@@ -16,9 +18,15 @@ class _CardsPageState extends State<CardsPage> with SingleTickerProviderStateMix
   late final TabController _tabController;
   late Future<List<PackageModel>> _packagesFuture;
   late Future<Map<String, int>> _availableFuture;
+  late Future<int> _balanceFuture;
+  late Future<List<CardTemplate>> _templatesFuture;
   PackageModel? _selectedPackage;
+  CardTemplate? _selectedTemplate;
   int _quantity = 10;
+  int _codeLength = 12;
   bool _creating = false;
+
+  static const _codeLengthOptions = [4, 6, 8, 12];
 
   @override
   void initState() {
@@ -26,6 +34,8 @@ class _CardsPageState extends State<CardsPage> with SingleTickerProviderStateMix
     _tabController = TabController(length: 2, vsync: this);
     _packagesFuture = SupabaseDataService.fetchPackages();
     _availableFuture = SupabaseDataService.fetchCardCountByPackage();
+    _balanceFuture = SupabaseDataService.fetchCardCreditBalance();
+    _templatesFuture = SupabaseDataService.fetchCardTemplates();
   }
 
   @override
@@ -37,6 +47,7 @@ class _CardsPageState extends State<CardsPage> with SingleTickerProviderStateMix
   void _refreshCounts() {
     setState(() {
       _availableFuture = SupabaseDataService.fetchCardCountByPackage();
+      _balanceFuture = SupabaseDataService.fetchCardCreditBalance();
     });
   }
 
@@ -60,6 +71,8 @@ class _CardsPageState extends State<CardsPage> with SingleTickerProviderStateMix
       final cards = await SupabaseDataService.generateCards(
         packageId: selected.id,
         quantity: _quantity,
+        codeLength: _codeLength,
+        templateId: _selectedTemplate?.id,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -203,6 +216,51 @@ class _CardsPageState extends State<CardsPage> with SingleTickerProviderStateMix
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          FutureBuilder<int>(
+            future: _balanceFuture,
+            builder: (context, snapshot) {
+              final balance = snapshot.data;
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1E88E5), Color(0xFF1565C0)],
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const CreditTopupPage()),
+                        );
+                        _refreshCounts();
+                      },
+                      style: TextButton.styleFrom(foregroundColor: Colors.white),
+                      icon: const Icon(Icons.add_circle_outline, size: 18),
+                      label: const Text('شحن رصيد'),
+                    ),
+                    const Spacer(),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          balance != null ? '$balance' : '—',
+                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                        ),
+                        const Text('رصيد الكروت المتاح', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
           const Text('الفئة', style: TextStyle(color: Colors.grey, fontSize: 13)),
           const SizedBox(height: 8),
           FutureBuilder<List<PackageModel>>(
@@ -285,6 +343,63 @@ class _CardsPageState extends State<CardsPage> with SingleTickerProviderStateMix
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 20),
+
+          const Text('طول كود الكرت', style: TextStyle(color: Colors.grey, fontSize: 13)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: _codeLengthOptions.map((len) {
+              final selected = _codeLength == len;
+              return ChoiceChip(
+                label: Text('$len رقم'),
+                selected: selected,
+                selectedColor: const Color(0xFF1E88E5),
+                backgroundColor: const Color(0xFF1F2937),
+                labelStyle: TextStyle(color: selected ? Colors.white : Colors.grey),
+                onSelected: (_) => setState(() => _codeLength = len),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+
+          const Text('قالب التصميم (اختياري)', style: TextStyle(color: Colors.grey, fontSize: 13)),
+          const SizedBox(height: 8),
+          FutureBuilder<List<CardTemplate>>(
+            future: _templatesFuture,
+            builder: (context, snapshot) {
+              final templates = snapshot.data ?? const [];
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1F2937),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<CardTemplate?>(
+                    value: _selectedTemplate,
+                    isExpanded: true,
+                    dropdownColor: const Color(0xFF1F2937),
+                    style: const TextStyle(color: Colors.white),
+                    hint: const Text('بدون قالب (تصميم افتراضي)', style: TextStyle(color: Colors.grey)),
+                    items: [
+                      const DropdownMenuItem<CardTemplate?>(
+                        value: null,
+                        child: Text('بدون قالب (تصميم افتراضي)'),
+                      ),
+                      ...templates.map((t) => DropdownMenuItem<CardTemplate?>(
+                            value: t,
+                            child: Text(t.name),
+                          )),
+                    ],
+                    onChanged: (t) => setState(() => _selectedTemplate = t),
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 28),
 
