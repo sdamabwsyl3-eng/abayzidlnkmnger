@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -59,3 +62,13 @@ jobs:
         with:
           name: app-release
           path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Publish APK to GitHub Release
+        # Direct APK download link (no zip, no artifact login quirks on mobile):
+        # https://github.com/<owner>/<repo>/releases/latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk abayazidnet.apk
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest abayazidnet.apk --title "أبايذيد نت" --notes "أحدث نسخة من التطبيق" --latest --target "$GITHUB_SHA"
