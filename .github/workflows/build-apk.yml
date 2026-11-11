@@ -39,11 +39,11 @@ jobs:
 
       - name: Set Arabic app label
         # Replace whatever android:label flutter create generated (it varies
-        # by Flutter version/template) with the Arabic app name, so it shows
+        # by Flutter version/template) with the Arabic app name (أبايذيد نت), so it shows
         # correctly after installation regardless of the generated default.
         run: |
-          sed -i 's#android:label="[^"]*"#android:label="أبا يزيد لنك منجر"#' android/app/src/main/AndroidManifest.xml
-          grep -q 'أبا يزيد لنك منجر' android/app/src/main/AndroidManifest.xml
+          sed -i 's#android:label="[^"]*"#android:label="أبايذيد نت"#' android/app/src/main/AndroidManifest.xml
+          grep -q 'أبايذيد نت' android/app/src/main/AndroidManifest.xml
 
       - name: Install dependencies
         run: flutter pub get
