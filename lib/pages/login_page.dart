@@ -102,7 +102,7 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 24),
 
                   const Text(
-                    'أبا يزيد لنك منجر',
+                    'أبايذيد نت',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 28,

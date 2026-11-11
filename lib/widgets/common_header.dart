@@ -36,7 +36,7 @@ class CommonHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'أبا يزيد لنك منجر',
+                  'أبايذيد نت',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,

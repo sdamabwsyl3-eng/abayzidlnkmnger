@@ -10,7 +10,7 @@ import '../models/operator_profile_model.dart';
 import '../models/package_model.dart';
 import '../models/store_item_model.dart';
 
-/// طبقة وصول موحّدة لبيانات أبا يزيد لنك منجر الحقيقية في Supabase
+/// طبقة وصول موحّدة لبيانات أبايذيد نت الحقيقية في Supabase
 /// (الملف الشخصي، الباقات، الكروت، المتجر) بدل البيانات الثابتة بالكود.
 class SupabaseDataService {
   static SupabaseClient get _client => Supabase.instance.client;

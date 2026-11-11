@@ -28,7 +28,7 @@ class _AccountPageState extends State<AccountPage> {
     final user = Supabase.instance.client.auth.currentUser;
     final fullName = (user?.userMetadata?['full_name'] as String?)?.trim();
     if (fullName != null && fullName.isNotEmpty) return fullName;
-    return user?.email?.split('@').first ?? 'مستخدم أبا يزيد';
+    return user?.email?.split('@').first ?? 'مستخدم أبايذيد';
   }
 
   String get _email => Supabase.instance.client.auth.currentUser?.email ?? '';
@@ -115,7 +115,7 @@ class _AccountPageState extends State<AccountPage> {
           ),
           const SizedBox(height: 12),
 
-          _buildInfoItem(Icons.info_outline, 'اسم التطبيق', 'أبا يزيد لنك منجر'),
+          _buildInfoItem(Icons.info_outline, 'اسم التطبيق', 'أبايذيد نت'),
           _buildInfoItem(Icons.code, 'الإصدار', '4.2.0'),
           FutureBuilder<OperatorProfile?>(
             future: _profileFuture,
@@ -164,7 +164,7 @@ class _AccountPageState extends State<AccountPage> {
 
           const Center(
             child: Text(
-              '© 2026 أبا يزيد — جميع الحقوق محفوظة',
+              '© 2026 أبايذيد — جميع الحقوق محفوظة',
               style: TextStyle(color: Colors.grey, fontSize: 12),
             ),
           ),
